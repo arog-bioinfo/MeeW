@@ -1,0 +1,297 @@
+from snakemake.utils import min_version
+
+min_version("9.12.0")
+
+
+# load configuration
+# -----------------------------------------------------
+configfile: "config/config.yaml"
+
+
+# load rules
+# -----------------------------------------------------
+include: "rules/module_setup.smk"
+
+
+module preprocessing:
+    pathvars:
+        results="results/{group,[A-Za-z0-9][A-Za-z0-9._-]*}/preprocessing",
+    snakefile:
+        str(MODULE_SNAKEFILES["preprocessing"])
+    config:
+        config["preprocessing"]
+
+
+use rule * from preprocessing exclude all as preprocessing_*
+
+
+include: "rules/common.smk"
+
+
+module assembly:
+    pathvars:
+        results="results/{sample}/assembly",
+    snakefile:
+        str(MODULE_SNAKEFILES["assembly"])
+    config:
+        {
+            **config["assembly"],
+            "genome_context": ASSEMBLY_GENOME_CONTEXT,
+        }
+    skip_validation:
+        True
+
+
+ASSEMBLY_ROUTE = expected_assembly_type()
+
+
+if ASSEMBLY_ROUTE in {"short", "hybrid"}:
+
+    use rule assemble_spades from assembly as assembly_assemble_spades with:
+        input:
+            unpack(
+                lambda wc: {
+                    "reads": expected_short_processed_reads(wc.sample),
+                    **(
+                        {
+                            expected_hybrid_long_read_key(
+                                wc.sample
+                            ): expected_long_processed_reads(wc.sample)
+                        }
+                        if ASSEMBLY_ROUTE == "hybrid"
+                        else {}
+                    ),
+                }
+            ),
+
+    use rule bwamem2_index from assembly as assembly_bwamem2_index with:
+        input:
+            lambda wc: expected_assembly_output(wc.sample),
+
+    use rule bwamem2_map from assembly as assembly_bwamem2_map with:
+        input:
+            idx=workflow.get_rule("assembly_bwamem2_index").output,
+            reads=lambda wc: expected_short_processed_reads(wc.sample),
+
+    use rule bwamem2_map_index from assembly as assembly_bwamem2_map_index
+
+elif ASSEMBLY_ROUTE == "long":
+
+    use rule assemble_flye_long from assembly as assembly_assemble_flye_long with:
+        input:
+            reads=lambda wc: expected_long_processed_reads(wc.sample),
+        params:
+            seq_type=lambda wc: expected_long_read_type(wc.sample),
+
+    use rule minimap2_map from assembly as assembly_minimap2_map with:
+        input:
+            target=lambda wc: expected_assembly_output(wc.sample),
+            query=lambda wc: expected_long_processed_reads(wc.sample),
+        params:
+            extra=lambda wc: assembly.compose_minimap2_extra(
+                expected_long_read_type(wc.sample),
+                config["assembly"].get("minimap2_extra", ""),
+            ),
+
+    use rule minimap2_map_index from assembly as assembly_minimap2_map_index
+
+
+use rule quast from assembly as assembly_quast with:
+    input:
+        fasta=lambda wc: expected_assembly_output(wc.sample),
+
+
+if IS_METAGENOME_CONTEXT:
+    BINNING_SEMIBIN2_SEQUENCING_TYPE = (
+        "short_read" if ASSEMBLY_ROUTE == "short" else "long_read"
+    )
+    BINNING_MODULE_CONFIG = inherit_main_resources(
+        {
+            **config["binning"],
+            "binning": {
+                **config["binning"]["binning"],
+                "semibin2": {
+                    **config["binning"]["binning"].get("semibin2", {}),
+                    "sequencing_type": BINNING_SEMIBIN2_SEQUENCING_TYPE,
+                },
+            },
+        }
+    )
+
+    module binning:
+        pathvars:
+            results="results/{sample}/binning",
+        snakefile:
+            str(MODULE_SNAKEFILES["binning"])
+        config:
+            BINNING_MODULE_CONFIG
+        skip_validation:
+            True
+
+    use rule * from binning exclude all as binning_*
+
+    use rule comebin from binning as binning_comebin with:
+        input:
+            contigs=lambda wc: expected_assembly_output(wc.sample),
+            bam=lambda wc: expected_mapping_bam_output(wc.sample),
+            atomic_script=str(
+                MODULE_SNAKEFILES["binning"].parent
+                / "scripts"
+                / "run_comebin_atomic.sh"
+            ),
+            checkm1_runner=binning.CHECKM1_RUNNER,
+            checkm1_helper=binning.CHECKM1_HELPER,
+
+    use rule metabinner_depth from binning as binning_metabinner_depth with:
+        input:
+            bams=lambda wc: [expected_mapping_bam_output(wc.sample)],
+
+    use rule metabinner_profiles from binning as binning_metabinner_profiles with:
+        input:
+            contigs=lambda wc: expected_assembly_output(wc.sample),
+            depth=lambda wc: expected_binning_rule_output(
+                "binning_metabinner_depth", "depth", wc.sample
+            ),
+
+    use rule semibin2 from binning as binning_semibin2 with:
+        input:
+            contigs=lambda wc: expected_assembly_output(wc.sample),
+            bams=lambda wc: [expected_mapping_bam_output(wc.sample)],
+
+    use rule metabat2_depth from binning as binning_metabat2_depth with:
+        input:
+            bams=lambda wc: [expected_mapping_bam_output(wc.sample)],
+
+    use rule metabat2 from binning as binning_metabat2 with:
+        input:
+            contigs=lambda wc: expected_assembly_output(wc.sample),
+            depth=lambda wc: expected_binning_rule_output(
+                "binning_metabat2_depth", "depth", wc.sample
+            ),
+
+    use rule tiara_predict from binning as binning_tiara_predict with:
+        input:
+            contigs=lambda wc: expected_assembly_output(wc.sample),
+
+    if BINNING_REFINEMENT_ENABLED:
+
+        use rule prepare_refinement_inputs from binning as binning_prepare_refinement_inputs with:
+            input:
+                bins_dirs=lambda wc: expected_refinement_binner_bins_inputs(wc.sample),
+                assembly=lambda wc: expected_assembly_output(wc.sample),
+                tiara_tsv=lambda wc: expected_binning_rule_output(
+                    "binning_tiara_predict", "tsv", wc.sample
+                ),
+
+        use rule refine_das_tool from binning as binning_refine_das_tool with:
+            input:
+                assembly=lambda wc: expected_assembly_output(wc.sample),
+                contig2bin=lambda wc: expected_refinement_mapping_inputs(wc.sample),
+                bin_domain_assignments=lambda wc: expected_refinement_assignments(
+                    wc.sample
+                ),
+
+    use rule coverm_genome_coverage from binning as binning_coverm_genome_coverage with:
+        input:
+            bins=lambda wc: expected_domain_bins_dir(wc.domain, wc.sample),
+            bam=lambda wc: expected_mapping_bam_output(wc.sample),
+
+
+ANNOTATION_MODULE_CONFIG = inherit_main_resources(
+    {
+        **config["annotation"],
+        "import_context": {
+            "enabled": True,
+            "sample": INITIAL_SAMPLE,
+            **(
+                {
+                    "mode": "metagenome",
+                    "prok_bins_dir": expected_domain_prok_bins_dir(),
+                    "euk_bins_dir": expected_domain_euk_bins_dir(),
+                }
+                if IS_METAGENOME_CONTEXT
+                else {
+                    "mode": "isolate",
+                    "domain": GENOME_CONTEXT,
+                    "path": expected_assembly_output(),
+                }
+            ),
+        },
+    }
+)
+
+
+module annotation:
+    pathvars:
+        results="results/{sample}/annotation",
+    snakefile:
+        str(MODULE_SNAKEFILES["annotation"])
+    config:
+        ANNOTATION_MODULE_CONFIG
+    skip_validation:
+        True
+
+
+use rule * from annotation exclude all as annotation_*
+
+
+if IS_METAGENOME_CONTEXT:
+    METABOLIC_MODELING_QA_ENABLED = annotation.QA_ENABLED and config[
+        "metabolic_modeling"
+    ].get("qa", {}).get("enabled", True)
+    METABOLIC_MODELING_MODULE_CONFIG = inherit_main_resources(
+        {
+            **config["metabolic_modeling"],
+            "sample": INITIAL_SAMPLE,
+            "qa": {
+                **config["metabolic_modeling"].get("qa", {}),
+                "enabled": METABOLIC_MODELING_QA_ENABLED,
+                "tsv": (
+                    expected_annotation_checkm2_report()
+                    if METABOLIC_MODELING_QA_ENABLED
+                    else ""
+                ),
+            },
+            "micom": {
+                "abundance_tsv": expected_coverm_prok_relative_abundance(),
+            },
+        }
+    )
+
+    module metabolic_modeling:
+        pathvars:
+            results="results/{sample}/metabolic_modeling",
+        snakefile:
+            str(MODULE_SNAKEFILES["metabolic_modeling"])
+        config:
+            METABOLIC_MODELING_MODULE_CONFIG
+
+    use rule * from metabolic_modeling exclude all, stage_checkm2_faa, checkm2 as metabolic_modeling_*
+
+    metabolic_modeling.bind_protein_sources(
+        sources=expected_metabolic_modeling_protein_sources,
+        taxonomy=expected_metabolic_modeling_gtdb_classification,
+    )
+
+
+# optional messages, log and error handling
+# -----------------------------------------------------
+onstart:
+    print("\n--- Analysis started ---\n")
+
+
+onsuccess:
+    print("\n--- Workflow finished! ---\n")
+
+
+onerror:
+    print("\n--- An error occurred! ---\n")
+
+
+# target rules
+# -----------------------------------------------------
+rule all:
+    default_target: True
+    input:
+        expected_main_outputs(),
+        expected_metabolic_modeling_outputs,

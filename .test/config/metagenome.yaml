@@ -1,0 +1,110 @@
+genome_context: metagenome
+
+preprocessing:
+  run_sheet: config/run.metagenome.tsv
+  auto_preprocess:
+    enabled: false
+
+assembly: {}
+
+binning:
+  binning:
+    tools:
+      - metabat2
+    comebin:
+      extra: ""
+    metabinner:
+      install_path: ""
+      min_contig_length: 1000
+      scale: large
+    semibin2:
+      environment: global
+      extra: ""
+    metabat2:
+      min_contig_length: 1500
+      seed: 1
+      extra: ""
+  refinement:
+    enabled: false
+    method: none
+  domain_separation:
+    fallback_domain: unknown
+    tiara:
+      extra: ""
+  coverm:
+    input_mode: bam
+    domains:
+      - prok
+      - euk
+    mapper: minimap2-sr
+    methods:
+      - relative_abundance
+    threads: 2
+    extra: ""
+
+annotation:
+  qa:
+    enabled: false
+    prok_tools:
+      - checkm2
+    euk_tools:
+      - eukcc
+    threads: 2
+    checkm2:
+      database_path: ""
+      download_database: false
+      extension: .fna
+      extra: ""
+    eukcc:
+      database_path: ""
+      download_database: false
+      extra: ""
+  qa_filter:
+    enabled: false
+  bakta:
+    db: ""
+    extra: ""
+  gtdbtk:
+    enabled: false
+    data_dir: ""
+    extra: ""
+  recognizer_prok:
+    resources_dir: ""
+    extra: ""
+  upimapi:
+    db: swissprot
+    db_custom: ""
+    resources_dir: ""
+    extra: ""
+    skip_db_check_if_exists: true
+  metaeuk:
+    database: UniRef90
+    db: ""
+    cache_dir: ""
+    max_exon_sets: 1
+    extra: ""
+  recognizer_euk:
+    resources_dir: ""
+    extra: ""
+  funannotate2:
+    db_dir: ""
+    databases:
+      - all
+    busco_lineage: eukaryota
+    clean: false
+    species: CI fixture species
+  threads:
+    high: 2
+    medium: 2
+    low: 1
+
+metabolic_modeling:
+  solver: scip
+  qa:
+    enabled: false
+  community:
+    enabled: false
+    tools:
+      smetana: false
+      micom: false
+      steadycom: false

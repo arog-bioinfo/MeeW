@@ -1,0 +1,238 @@
+# Optional directory containing MeeW-* sibling repositories. If empty, MeeW
+# checks MEEW_MODULES_ROOT and then the parent directory containing this repo.
+modules_root: ""
+
+# Optional shared persistent resource root. A nonblank value is forwarded to
+# Binning, Annotation, and Metabolic Modeling only when that module's own root
+# is blank or omitted.
+resources_root: ""
+
+# One Main-owned routing context. `metagenome` runs Binning; `prok` and `euk`
+# route the Assembly FASTA directly to the matching singular Annotation route.
+genome_context: "metagenome"
+
+preprocessing:
+  run_sheet: config/preprocessing_run_sheet.tsv
+  auto_preprocess:
+    enabled: true
+    # Composition-derived 5' headcrop is disabled by default. When explicitly
+    # enabled, the legacy A/T and G/C imbalance scan and maximum remain in use.
+    composition_headcrop_enabled: false
+    max_headcrop: 12
+    headcrop_base_imbalance_threshold: 0.10
+
+    # Infer each mate's 3' tailcrop from its Sequali end-anchor mean qualities.
+    # Starting at the 3' end, choose the shortest suffix with the greatest positive
+    # cumulative weighted sum of (tailcrop_mott_quality_cutoff - mean_quality).
+    tailcrop_mott_quality_cutoff: 20
+    mott_positive_weight: 1.0
+    mott_negative_weight: 1.0
+    # Safeguard a raw tailcrop trigger by retaining at least this fraction of
+    # the corresponding nominal maximum raw-read length (rounded up).
+    tailcrop_min_retained_fraction: 0.75
+
+    # Short-read read-level filtering
+    # Sequali/NanoPlot average quality uses expected-error rates,
+    # while FastQC/Falco/Fastp average phred scores; Q>=X counts
+    # can therefore differ substantially and are not strictly comparable.
+    average_quality: 30
+    minimum_length: 30
+  sequali:
+    extra: ""
+  fastp:
+    adapters: ""
+    extra: ""
+  chopper:
+    extra: ""
+  porechop_abi:
+    extra: ""
+    # Empty uses config/porechop_abi.config from the resolved module repository.
+    ab_initio_config: ""
+    custom_adapters: ""
+
+assembly:
+  # Main derives MeeW-Assembly's metagenome/isolate mode from genome_context.
+  metaspades_threads: 4
+  flye_threads: 4
+  quast_threads: 2
+  bwamem2_threads: 4
+  minimap2_threads: 4
+  metaspades_memory_gb: 110
+  metaspades_kmers: "auto"
+  metaspades_extra: ""
+  flye_extra: ""
+  quast_min_contig: 500
+  quast_min_identity: 95.0
+  quast_extra: ""
+  bwamem2_index_extra: ""
+  bwamem2_mem_extra: ""
+  bwamem2_sort: "samtools"
+  bwamem2_sort_order: "coordinate"
+  bwamem2_sort_extra: ""
+  minimap2_extra: ""
+
+binning:
+  # Used only when genome_context is metagenome. Main derives contigs and the
+  # exact BAM from Assembly; no standalone sample sheet is accepted.
+  resources_root: ""
+  checkm1:
+    # Exact COMEBin/MetaBinner CheckM 1 database directory when nonblank;
+    # otherwise derive checkm1_db from the effective Binning/shared/ambient root.
+    database_path: ""
+    download_database: true
+  binning:
+    tools:
+      - comebin
+    comebin:
+      extra: ""
+    metabinner:
+      # Empty checks METABINNER_HOME, then the Bioconda runner on PATH.
+      install_path: ""
+      # Contigs are retained with strict length > this threshold.
+      min_contig_length: 1000
+      scale: "large"
+    semibin2:
+      # Main injects sequencing_type from Assembly routing.
+      environment: "global"
+      extra: ""
+    metabat2:
+      min_contig_length: 1500
+      seed: 1
+      extra: ""
+  refinement:
+    enabled: false
+    method: "none"
+    euk_source_tool: "comebin"
+    das_tool:
+      score_threshold: 0.5
+      threads: 8
+  domain_separation:
+    fallback_domain: "unknown"
+    tiara:
+      extra: ""
+  coverm:
+    # CoverM is mandatory for metagenomes, accepts BAM mode only, and uses the
+    # exact Assembly BAM.
+    domains:
+      - prok
+      - euk
+    input_mode: "bam"
+    mapper: "minimap2-sr"
+    methods:
+      - relative_abundance
+      - mean
+      - covered_fraction
+    threads: 4
+    extra: ""
+
+annotation:
+  # Main injects Binning prok/euk directories for metagenomes or the Assembly
+  # FASTA plus domain for singular genomes.
+  # Optional shared root for Annotation database/reference defaults. Explicit
+  # Annotation tool paths still take precedence; blank preserves environment fallbacks.
+  resources_root: ""
+  qa:
+    enabled: true
+    prok_tools:
+      - checkm2
+    euk_tools:
+      - eukcc
+    threads: 8
+    checkm2:
+      database_path: ""
+      download_database: false
+      extension: ".fna"
+      extra: "--force"
+    eukcc:
+      database_path: ""
+      download_database: false
+      extra: ""
+  qa_filter:
+    enabled: true
+    min_completeness: 50.0
+    max_contamination: 10.0
+  bakta:
+    type: full
+    db: ""
+    extra: ""
+  gtdbtk:
+    enabled: false
+    data_dir: ""
+    extra: ""
+  recognizer_prok:
+    resources_dir: ""
+    extra: ""
+  upimapi:
+    db: "swissprot"
+    db_custom: ""
+    resources_dir: ""
+    extra: ""
+    skip_db_check_if_exists: true
+  metaeuk:
+    database: UniRef90
+    db: ""
+    cache_dir: ""
+    max_exon_sets: 1
+    extra: ""
+  recognizer_euk:
+    resources_dir: ""
+    extra: ""
+  funannotate2:
+    db_dir: ""
+    databases:
+      - all
+    busco_lineage: "eukaryota"
+    clean: false
+    species: ""
+    strain: ""
+    params: ""
+    pretrained: ""
+    extra_clean: ""
+    extra_train: ""
+    extra_predict: ""
+    extra_annotate: ""
+  threads:
+    high: 16
+    medium: 8
+    low: 1
+
+metabolic_modeling:
+  # Main derives the sample and exact Annotation Bakta directories. Standalone
+  # FAA discovery, QA paths/columns, and internal CheckM2 are not accepted
+  # here. Enabled Annotation GTDB-Tk supplies each CarveMe job's universe;
+  # otherwise CarveMe uses its explicit bacterial fallback.
+  resources_root: ""
+  solver: cplex
+  media: M9
+  cplex:
+    studio_dir: ""
+    auto_upgrade: true
+  execution:
+    mock: false
+  qa:
+    enabled: true
+    min_completeness: 50.0
+    max_contamination: 10.0
+  memote:
+    min_total_score: 0.4
+  community:
+    enabled: true
+    tools:
+      smetana: true
+      micom: true
+      steadycom: true
+  simulation_medium:
+    source: discover
+    aggregation: sum
+    predefined_medium: M9
+    min_growth: 0.1
+    open_exchanges: true
+    exchange_bound: 1000
+  smetana:
+    modes:
+      global: true
+      detailed: false
+    media_db: ""
+    media: []
+  steadycom:
+    objective: community_growth

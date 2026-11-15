@@ -1,0 +1,45 @@
+# Deprecated integrated fragment. The active orchestrator uses config/config.yaml.
+# Main supplies all sample-associated inputs directly from imported Assembly rules.
+resources_root: ""
+checkm1:
+  database_path: ""
+  download_database: true
+binning:
+  tools:
+    - comebin
+  comebin:
+    extra: ""
+  metabinner:
+    install_path: ""
+    min_contig_length: 1000
+    scale: large
+  semibin2:
+    environment: global
+    extra: ""
+  metabat2:
+    min_contig_length: 1500
+    seed: 1
+    extra: ""
+refinement:
+  enabled: false
+  method: none
+  euk_source_tool: comebin
+  das_tool:
+    score_threshold: 0.5
+    threads: 8
+domain_separation:
+  fallback_domain: unknown
+  tiara:
+    extra: ""
+coverm:
+  domains:
+    - prok
+    - euk
+  input_mode: bam
+  mapper: minimap2-sr
+  methods:
+    - relative_abundance
+    - mean
+    - covered_fraction
+  threads: 1
+  extra: ""

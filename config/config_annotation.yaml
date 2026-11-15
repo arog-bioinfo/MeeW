@@ -1,0 +1,67 @@
+# Deprecated standalone fragment. The active orchestrator uses config/config.yaml.
+# Optional shared root for Annotation database/reference defaults.
+resources_root: ""
+qa:
+  enabled: true
+  prok_tools:
+    - checkm2
+  euk_tools:
+    - eukcc
+  threads: 8
+  checkm2:
+    database_path: ""
+    download_database: false
+    extension: .fna
+    extra: --force
+  eukcc:
+    database_path: ""
+    download_database: false
+    extra: ""
+qa_filter:
+  enabled: true
+  min_completeness: 50.0
+  max_contamination: 10.0
+bakta:
+  type: full
+  db: ""
+  extra: ""
+gtdbtk:
+  enabled: false
+  data_dir: ""
+  extra: ""
+recognizer_prok:
+  resources_dir: ""
+  extra: ""
+upimapi:
+  db: swissprot
+  db_custom: ""
+  resources_dir: ""
+  extra: ""
+  skip_db_check_if_exists: true
+metaeuk:
+  database: UniRef90
+  db: ""
+  cache_dir: ""
+  max_exon_sets: 1
+  extra: ""
+recognizer_euk:
+  resources_dir: ""
+  extra: ""
+funannotate2:
+  db_dir: ""
+  databases:
+    - all
+  busco_lineage: eukaryota
+  clean: false
+  species: ""
+  strain: ""
+  params: ""
+  pretrained: ""
+  extra_clean: ""
+  extra_train: ""
+  extra_predict: ""
+  extra_annotate: ""
+threads:
+  high: 1
+  medium: 1
+  low: 1

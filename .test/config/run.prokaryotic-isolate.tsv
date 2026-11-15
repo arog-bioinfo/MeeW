@@ -1,0 +1,2 @@
+group	sample	data_type	read1	read2
+ci_prokaryotic_isolate	short	short_pe	data/short_R1.fastq	data/short_R2.fastq

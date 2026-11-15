@@ -1,0 +1,54 @@
+# Deprecated standalone fragment. The active orchestrator uses config/config.yaml.
+resources_root: ""
+input:
+  faa_globs:
+    - ../MeeW-Metabolic_Modeling/data/mags/*.faa
+  faa_dir: ""
+solver: cplex
+media: M9
+execution:
+  mock: true
+qa:
+  enabled: false
+  tsv: ""
+  columns:
+    id: Name
+    completeness: Completeness
+    contamination: Contamination
+  min_completeness: 50.0
+  max_contamination: 10.0
+checkm2:
+  enabled: false
+  database_path: ""
+  download_database: false
+  threads: 1
+  extension: faa
+  extra: ""
+memote:
+  min_total_score: 0.4
+community:
+  enabled: false
+  tools:
+    smetana: false
+    micom: false
+    steadycom: false
+simulation_medium:
+  source: discover
+  aggregation: sum
+  predefined_medium: M9
+  min_growth: 0.1
+  open_exchanges: true
+  exchange_bound: 1000
+micom:
+  abundance_tsv: ""
+steadycom:
+  objective: community_growth
+sensitivity_analysis:
+  enabled: false
+  first_qa:
+    min_completeness: [50, 60, 70, 80, 90]
+    max_contamination: [5, 10, 15, 20]
+  memote:
+    min_total_score: [0.3, 0.4, 0.5, 0.6, 0.7]
+comparison:
+  enabled: false

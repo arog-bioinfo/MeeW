@@ -1,0 +1,1068 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+description: Configuration for the five-stage MeeW orchestrator; Metabolic Modeling extends only the default metagenome route when Annotation selects passing prokaryotic MAGs.
+properties:
+  modules_root:
+    type: string
+    description: Optional directory containing the side-by-side MeeW module repositories; environment variables and ~ are expanded and relative values use the Snakemake working directory.
+    default: ""
+
+  resources_root:
+    type: string
+    description: Optional shared persistent resource root forwarded to Binning, Annotation, and Metabolic Modeling only when each module-specific resources_root is blank or omitted. Explicit tool paths and nonblank module roots take precedence.
+    default: ""
+
+  genome_context:
+    type: string
+    description: Single Main-owned routing context; metagenome runs Assembly in metagenome mode through mandatory Binning, Annotation, and qualifying Metabolic Modeling, while prok and euk run Assembly in isolate mode directly into the matching Annotation route.
+    enum: [metagenome, prok, euk]
+    default: metagenome
+
+  preprocessing:
+    type: object
+    description: Configuration passed to MeeW-Preprocessing; the module alone parses, validates, and normalizes its run sheet, while Main passes the configured value unchanged, consumes the evaluated namespace, and applies the stricter integrated cardinality and Assembly-route contract.
+    properties:
+      run_sheet:
+        type: string
+        description: TSV run-sheet value passed unchanged to MeeW-Preprocessing, which expands, parses, validates, and normalizes it; Main consumes module-owned run state, requires exactly one group with one or two rows, accepts only one short_pe row, one Flye-compatible long row, or their exact pair, and rejects all other group, cardinality, and mode combinations.
+        minLength: 1
+      auto_preprocess:
+        type: object
+        description: Sequali-based automatic preprocessing inference.
+        properties:
+          enabled:
+            type: boolean
+            description: Infer preprocessing arguments from raw Sequali JSON.
+            default: true
+          composition_headcrop_enabled: {}
+          max_headcrop: {}
+          headcrop_base_imbalance_threshold: {}
+          tailcrop_mott_quality_cutoff: {}
+          mott_positive_weight: {}
+          mott_negative_weight: {}
+          tailcrop_min_retained_fraction: {}
+          average_quality: {}
+          minimum_length: {}
+        additionalProperties: false
+      sequali:
+        type: object
+        description: Sequali quality-control settings.
+        properties:
+          extra:
+            type: string
+            description: Additional trusted CLI options passed to Sequali.
+            default: ""
+        additionalProperties: false
+      fastp:
+        type: object
+        description: fastp trimming and filtering settings.
+        properties:
+          adapters:
+            type: string
+            description: Adapter-related options passed to the fastp wrapper.
+            default: ""
+          extra:
+            type: string
+            description: Additional trusted CLI options passed to fastp.
+            default: ""
+        additionalProperties: false
+      chopper:
+        type: object
+        description: Chopper long-read trimming and filtering settings.
+        properties:
+          extra:
+            type: string
+            description: Additional trusted CLI options passed to Chopper.
+            default: ""
+        additionalProperties: false
+      porechop_abi:
+        type: object
+        description: Porechop_ABI adapter-trimming settings.
+        properties:
+          extra:
+            type: string
+            description: Additional trusted CLI options passed to Porechop_ABI.
+            default: ""
+          ab_initio_config:
+            type: string
+            description: Optional ab-initio configuration path; empty uses the file from the resolved Preprocessing module.
+            default: ""
+          custom_adapters:
+            type: string
+            description: Optional custom adapter definition path.
+            default: ""
+        additionalProperties: false
+    required:
+      - run_sheet
+    allOf:
+      - not:
+          required: [pathvars]
+      - not:
+          required: [stage_sheets]
+    additionalProperties: true
+
+  assembly:
+    type: object
+    description: Scientific configuration passed to MeeW-Assembly; Main derives the module genome context from the top-level genome_context, skips standalone module validation, and derives routing and reads exclusively from the evaluated Preprocessing namespace.
+    properties:
+      metaspades_threads:
+        type: integer
+        description: Maximum threads for metaSPAdes.
+        minimum: 1
+        default: 4
+      metaspades_memory_gb:
+        type: integer
+        description: Memory limit passed to metaSPAdes, in gigabytes.
+        minimum: 1
+        default: 110
+      flye_threads:
+        type: integer
+        description: Maximum threads for Flye.
+        minimum: 1
+        default: 4
+      quast_threads:
+        type: integer
+        description: Maximum threads for QUAST or MetaQUAST.
+        minimum: 1
+        default: 2
+      bwamem2_threads:
+        type: integer
+        description: Maximum threads for BWA-MEM2 mapping.
+        minimum: 1
+        default: 4
+      minimap2_threads:
+        type: integer
+        description: Maximum threads for minimap2 mapping.
+        minimum: 1
+        default: 4
+      metaspades_kmers:
+        type: string
+        description: metaSPAdes k-mer selection, such as auto or a comma-separated list.
+        default: auto
+      metaspades_extra:
+        type: string
+        description: Additional trusted CLI options passed to metaSPAdes.
+        default: ""
+      flye_extra:
+        type: string
+        description: Additional trusted CLI options passed to Flye.
+        default: ""
+      quast_min_contig:
+        type: integer
+        description: Minimum contig length included in assembly assessment.
+        minimum: 0
+        default: 500
+      quast_min_identity:
+        type: number
+        description: Minimum alignment identity percentage used by assembly assessment.
+        minimum: 0
+        maximum: 100
+        default: 95.0
+      quast_extra:
+        type: string
+        description: Additional trusted CLI options passed to QUAST or MetaQUAST.
+        default: ""
+      bwamem2_index_extra:
+        type: string
+        description: Additional trusted CLI options passed to BWA-MEM2 indexing.
+        default: ""
+      bwamem2_mem_extra:
+        type: string
+        description: Additional trusted CLI options passed to BWA-MEM2 mapping.
+        default: ""
+      bwamem2_sort:
+        type: string
+        description: Program used to sort BWA-MEM2 alignments.
+        enum: [samtools, picard]
+        default: samtools
+      bwamem2_sort_order:
+        type: string
+        description: Sort order for BWA-MEM2 alignments.
+        enum: [coordinate]
+        default: coordinate
+      bwamem2_sort_extra:
+        type: string
+        description: Additional trusted CLI options passed to the selected BAM sorter.
+        default: ""
+      minimap2_extra:
+        type: string
+        description: Additional trusted minimap2 arguments; do not set -x because Main derives the preset from the normalized Flye-compatible long row in the current integrated route.
+        default: ""
+    allOf:
+      - not:
+          required: [sample_sheet]
+      - not:
+          required: [genome_context]
+      - not:
+          required: [metaspades_meta]
+      - not:
+          required: [quast_mode]
+      - not:
+          required: [pathvars]
+      - not:
+          required: [stage_sheets]
+    additionalProperties: true
+
+  binning:
+    type: object
+    description: Metagenome-only scientific configuration passed to MeeW-Binning; Main derives every sample material from Assembly, injects the Assembly-routed SemiBin2 sequencing type, and always runs CoverM.
+    properties:
+      resources_root:
+        type: string
+        default: ""
+        description: Optional Binning-specific resource root. Nonblank overrides Main resources_root; blank inherits a nonblank Main root, otherwise Binning preserves MEEW_RESOURCES, XDG_DATA_HOME/meew, and ~/resources.
+      checkm1:
+        type: object
+        description: CheckM 1 database setup used by COMEBin and MetaBinner before native scoring and expensive processing; unsupported whitespace-containing native paths are rejected early.
+        properties:
+          database_path:
+            type: string
+            default: ""
+            description: Optional exact CheckM 1 database directory; nonblank overrides module, Main, and ambient resource roots.
+          download_database:
+            type: boolean
+            default: true
+            description: At COMEBin or MetaBinner job time, use that environment's installed CheckM Bioconda post-link setup when the selected exact directory is absent or empty.
+        additionalProperties: false
+      binning:
+        type: object
+        description: Binner selection and tool-specific options.
+        properties:
+          tools:
+            type: array
+            description: One direct binner, or two to four distinct binners when DAS Tool refinement is enabled.
+            minItems: 1
+            maxItems: 4
+            uniqueItems: true
+            items:
+              type: string
+              enum: [comebin, metabinner, semibin2, metabat2]
+            default: [comebin]
+          comebin:
+            type: object
+            description: ComeBin options.
+            properties:
+              extra:
+                type: string
+                description: Additional trusted CLI options passed to ComeBin.
+                default: ""
+            required: [extra]
+            additionalProperties: false
+          metabinner:
+            type: object
+            description: MetaBinner installation, profile filtering, and scale settings.
+            properties:
+              install_path:
+                type: string
+                description: Optional MetaBinner tool root, Bioconda bin directory, or Conda prefix; native MetaBinner paths containing whitespace are rejected early because its shell does not quote every path.
+                default: ""
+              min_contig_length:
+                type: integer
+                description: Contigs are retained only when their length is strictly greater than this threshold.
+                minimum: 1
+                default: 1000
+              scale:
+                type: string
+                description: MetaBinner dataset scale.
+                enum: [small, large, huge]
+                default: large
+            additionalProperties: false
+          semibin2:
+            type: object
+            description: SemiBin2 settings; Main owns and injects sequencing_type from the Assembly route.
+            properties:
+              environment:
+                type: [string, "null"]
+                enum:
+                  - human_gut
+                  - dog_gut
+                  - ocean
+                  - soil
+                  - cat_gut
+                  - human_oral
+                  - mouse_gut
+                  - pig_gut
+                  - built_environment
+                  - wastewater
+                  - chicken_caecum
+                  - global
+                  - null
+                description: Pretrained habitat for one BAM; null selects self-supervised training.
+                default: global
+              extra:
+                type: string
+                description: Additional trusted CLI options passed to SemiBin2.
+                default: ""
+            required: [environment, extra]
+            additionalProperties: false
+          metabat2:
+            type: object
+            description: MetaBAT2 settings.
+            properties:
+              min_contig_length:
+                type: integer
+                description: Minimum contig length accepted by MetaBAT2.
+                minimum: 1500
+                default: 1500
+              seed:
+                type: integer
+                description: MetaBAT2 random seed.
+                minimum: 0
+                default: 1
+              extra:
+                type: string
+                description: Additional trusted CLI options passed to MetaBAT2.
+                default: ""
+            required: [min_contig_length, extra]
+            additionalProperties: false
+        required: [tools]
+        allOf:
+          - if:
+              properties:
+                tools:
+                  contains:
+                    const: comebin
+            then:
+              required: [comebin]
+          - if:
+              properties:
+                tools:
+                  contains:
+                    const: metabinner
+            then:
+              required: [metabinner]
+          - if:
+              properties:
+                tools:
+                  contains:
+                    const: semibin2
+            then:
+              required: [semibin2]
+          - if:
+              properties:
+                tools:
+                  contains:
+                    const: metabat2
+            then:
+              required: [metabat2]
+        additionalProperties: false
+      refinement:
+        type: object
+        description: Direct routing or multi-binner DAS Tool refinement.
+        properties:
+          enabled:
+            type: boolean
+          method:
+            type: string
+            enum: [none, das_tool]
+          euk_source_tool:
+            type: string
+            enum: [comebin, metabinner, semibin2, metabat2]
+            description: Selected source binner whose original eukaryotic and unknown FASTAs are retained during refinement.
+          das_tool:
+            type: object
+            properties:
+              score_threshold:
+                type: number
+                minimum: 0
+                maximum: 1
+                default: 0.5
+              threads:
+                type: integer
+                minimum: 1
+                default: 8
+            required: [score_threshold, threads]
+            additionalProperties: false
+        required: [enabled, method]
+        allOf:
+          - if:
+              properties:
+                enabled:
+                  const: true
+              required: [enabled]
+            then:
+              properties:
+                method:
+                  const: das_tool
+              required: [euk_source_tool, das_tool]
+            else:
+              properties:
+                method:
+                  const: none
+        additionalProperties: false
+      domain_separation:
+        type: object
+        description: Settings for assigning final bins to prokaryotic, eukaryotic, or retained unknown domains.
+        properties:
+          fallback_domain:
+            type: string
+            description: Domain assigned when Tiara does not provide a usable classification.
+            enum: [prok, euk, unknown]
+            default: unknown
+          tiara:
+            type: object
+            description: Tiara domain-classification options.
+            properties:
+              extra:
+                type: string
+                description: Additional trusted CLI options passed to Tiara.
+                default: ""
+            required: [extra]
+            additionalProperties: false
+        required:
+          - fallback_domain
+          - tiara
+        additionalProperties: false
+      coverm:
+        type: object
+        description: Mandatory CoverM abundance estimation from the exact Assembly BAM; integrated raw-read modes are unsupported and domain/method selection remains configurable.
+        properties:
+          input_mode:
+            type: string
+            description: Integrated CoverM always consumes the route-selected Assembly BAM.
+            const: bam
+            default: bam
+          domains:
+            type: array
+            description: Final domain directories covered by CoverM; unknown bins are never eligible.
+            minItems: 1
+            maxItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              enum: [prok, euk]
+            default: [prok, euk]
+          mapper:
+            type: string
+            description: Current Binning CoverM mapper setting; it is inactive in integrated BAM mode.
+            enum:
+              - minimap2-sr
+              - minimap2-ont
+              - minimap2-pb
+              - minimap2-hifi
+              - minimap2-no-preset
+              - bwa-mem2
+            default: minimap2-sr
+          methods:
+            type: array
+            description: CoverM genome summary methods.
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+            default: [relative_abundance, mean, covered_fraction]
+          threads:
+            type: integer
+            description: Maximum threads for CoverM.
+            minimum: 1
+            default: 4
+          extra:
+            type: string
+            description: Additional trusted CLI options passed to CoverM.
+            default: ""
+          genome_fasta_extension:
+            type: string
+            description: FASTA suffix CoverM uses when discovering genomes in each final domain directory.
+            minLength: 1
+            default: .fa
+        required: [input_mode, domains, mapper, methods, threads, extra]
+        additionalProperties: false
+    required:
+      - binning
+      - refinement
+      - domain_separation
+      - coverm
+    allOf:
+      - if:
+          properties:
+            refinement:
+              properties:
+                enabled:
+                  const: true
+              required: [enabled]
+          required: [refinement]
+        then:
+          properties:
+            binning:
+              properties:
+                tools:
+                  minItems: 2
+        else:
+          properties:
+            binning:
+              properties:
+                tools:
+                  maxItems: 1
+    additionalProperties: false
+
+  annotation:
+    type: object
+    description: Current scientific configuration passed to MeeW-Annotation; Main injects a private context from Binning for metagenomes or Assembly for singular prok/euk genomes.
+    properties:
+      resources_root:
+        type: string
+        default: ""
+        description: Optional shared root for Annotation database/reference defaults; explicit Annotation tool paths take precedence, while blank preserves tool environment variables, MEEW_RESOURCES, XDG_DATA_HOME/meew, and ~/resources. Environment variables and ~ are expanded and relative paths use the Snakemake working directory.
+      qa:
+        type: object
+        description: Annotation-owned CheckM2 and EukCC quality assessment.
+        properties:
+          enabled:
+            type: boolean
+            default: true
+          prok_tools:
+            type: array
+            minItems: 1
+            maxItems: 1
+            uniqueItems: true
+            items:
+              const: checkm2
+          euk_tools:
+            type: array
+            minItems: 1
+            maxItems: 1
+            uniqueItems: true
+            items:
+              const: eukcc
+          threads:
+            type: integer
+            minimum: 1
+            default: 8
+          checkm2:
+            type: object
+            properties:
+              database_path:
+                type: string
+                description: Optional explicit CheckM2 path; otherwise nonblank annotation.resources_root, CHECKM2DB, and ambient MeeW resource roots are checked in that order.
+              download_database:
+                type: boolean
+                default: false
+              extension:
+                type: string
+                enum: [.fa, .fna, .fasta]
+              extra:
+                type: string
+            required: [database_path, download_database, extension, extra]
+            additionalProperties: false
+          eukcc:
+            type: object
+            properties:
+              database_path:
+                type: string
+                description: Optional explicit EukCC path; otherwise nonblank annotation.resources_root, EUKCC2_DB/EUKCC_DB, and ambient MeeW resource roots are checked in that order.
+              download_database:
+                type: boolean
+                default: false
+              extra:
+                type: string
+            required: [database_path, download_database, extra]
+            additionalProperties: false
+        required: [prok_tools, euk_tools, threads, checkm2, eukcc]
+        additionalProperties: false
+      qa_filter:
+        type: object
+        description: Annotation-owned threshold decisions for MAGs; must be disabled when qa.enabled is false.
+        properties:
+          enabled:
+            type: boolean
+            default: true
+          min_completeness:
+            type: number
+            default: 50.0
+          max_contamination:
+            type: number
+            default: 10.0
+        additionalProperties: false
+      bakta:
+        type: object
+        description: Bakta annotation settings with database selection separate from local database location.
+        properties:
+          type:
+            type: string
+            enum: [full, light]
+            default: full
+            description: Bakta database type selected for automatic setup; omission uses full.
+          db:
+            type: string
+            description: Optional explicit local Bakta database directory; otherwise nonblank annotation.resources_root, BAKTA_DB, and the type-specific ambient Annotation resource-root location are checked in that order.
+          extra:
+            type: string
+        required: [db]
+        additionalProperties: false
+      gtdbtk:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+            default: false
+          data_dir:
+            type: string
+            description: Optional explicit GTDB-Tk root; otherwise nonblank annotation.resources_root, GTDBTK_DATA_PATH, and ambient MeeW resource roots are checked in that order.
+          extra:
+            type: string
+        allOf:
+          - if:
+              required: [enabled]
+              properties:
+                enabled:
+                  const: true
+            then:
+              required: [data_dir]
+        additionalProperties: false
+      recognizer_prok:
+        type: object
+        properties:
+          resources_dir:
+            type: string
+            description: Optional explicit prokaryotic reCOGnizer database directory; otherwise nonblank annotation.resources_root, RECOGNIZER_RESOURCES, and ambient MeeW resource roots are checked in that order.
+          extra:
+            type: string
+        required: [resources_dir]
+        additionalProperties: false
+      upimapi:
+        type: object
+        properties:
+          db:
+            type: string
+            enum: [uniprot, swissprot, taxids, ""]
+            default: swissprot
+          db_custom:
+            type: string
+          resources_dir:
+            type: string
+            description: Optional explicit UPIMAPI database directory; otherwise nonblank annotation.resources_root, UPIMAPI_RESOURCES, and ambient MeeW resource roots are checked in that order.
+          extra:
+            type: string
+          skip_db_check_if_exists:
+            type: boolean
+            default: true
+        required: [db, db_custom, resources_dir, extra, skip_db_check_if_exists]
+        allOf:
+          - if:
+              properties:
+                db_custom:
+                  minLength: 1
+            then:
+              properties:
+                db:
+                  const: ""
+          - if:
+              properties:
+                db:
+                  minLength: 1
+            then:
+              properties:
+                db_custom:
+                  const: ""
+        additionalProperties: false
+      metaeuk:
+        type: object
+        description: MetaEuk settings with MMseqs2 catalog selection separate from cache and local-prefix locations.
+        properties:
+          database:
+            type: string
+            default: UniRef90
+            description: Free-form MMseqs2 catalog name passed as one databases argument; omission or blank uses UniRef90 and surrounding whitespace is trimmed.
+          db:
+            type: string
+            description: Optional explicit local MMseqs2 database prefix; blank derives a source-specific prefix in cache_dir.
+          cache_dir:
+            type: string
+            description: Explicit persistent cache root for automatic MMseqs2 catalog setup; otherwise nonblank annotation.resources_root, METAEUK_DB, and ambient MeeW resource roots are checked in that order.
+          max_exon_sets:
+            type: integer
+            minimum: 1
+            default: 1
+          extra:
+            type: string
+        required: [db, cache_dir, max_exon_sets, extra]
+        additionalProperties: false
+      recognizer_euk:
+        type: object
+        properties:
+          resources_dir:
+            type: string
+            description: Optional explicit eukaryotic reCOGnizer database directory; otherwise nonblank annotation.resources_root, RECOGNIZER_RESOURCES, and ambient MeeW resource roots are checked in that order.
+          extra:
+            type: string
+        required: [resources_dir]
+        additionalProperties: false
+      funannotate2:
+        type: object
+        properties:
+          db_dir:
+            type: string
+            description: Optional explicit Funannotate2 database directory; otherwise nonblank annotation.resources_root, FUNANNOTATE2_DB, and ambient MeeW resource roots are checked in that order.
+          databases:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              enum:
+                [
+                  all,
+                  merops,
+                  uniprot,
+                  dbCAN,
+                  pfam,
+                  go,
+                  mibig,
+                  interpro,
+                  gene2product,
+                  mito,
+                ]
+            default: [all]
+          busco_lineage:
+            type: string
+            minLength: 1
+            pattern: ^[A-Za-z0-9._-]+$
+            default: eukaryota
+          clean:
+            type: boolean
+            default: false
+          species:
+            type: [string, "null"]
+          strain:
+            type: [string, "null"]
+          params:
+            type: [string, "null"]
+          pretrained:
+            type: [string, "null"]
+          extra_clean:
+            type: [string, "null"]
+          extra_train:
+            type: [string, "null"]
+          extra_predict:
+            type: [string, "null"]
+          extra_annotate:
+            type: [string, "null"]
+        required: [db_dir, databases, busco_lineage, clean]
+        allOf:
+          - not:
+              required: [params, pretrained]
+              properties:
+                params:
+                  type: string
+                  minLength: 1
+                pretrained:
+                  type: string
+                  minLength: 1
+          - if:
+              required: [pretrained]
+              properties:
+                pretrained:
+                  type: string
+                  minLength: 1
+            then:
+              required: [species]
+              properties:
+                species:
+                  type: string
+                  minLength: 1
+                  pattern: "\\S"
+        additionalProperties: false
+      threads:
+        type: object
+        properties:
+          high:
+            type: integer
+          medium:
+            type: integer
+          low:
+            type: integer
+        additionalProperties: false
+    required:
+      - qa
+      - qa_filter
+      - bakta
+      - metaeuk
+      - recognizer_prok
+      - recognizer_euk
+      - funannotate2
+      - upimapi
+      - threads
+    allOf:
+      - if:
+          properties:
+            qa:
+              required: [enabled]
+              properties:
+                enabled:
+                  const: false
+        then:
+          properties:
+            qa_filter:
+              required: [enabled]
+              properties:
+                enabled:
+                  const: false
+    additionalProperties: false
+
+  metabolic_modeling:
+    type: object
+    description: Scientific settings for direct metagenome-only MeeW-Metabolic_Modeling integration; Main owns the sample, exact Annotation Bakta-directory inputs, optional enabled Annotation GTDB-Tk classification dependency, QA report/columns, path relocation, and internal CheckM2 exclusion.
+    properties:
+      resources_root:
+        type: string
+        default: ""
+        description: Optional Metabolic Modeling-specific resource root. Nonblank overrides Main resources_root; blank inherits a nonblank Main root without enabling the module's excluded internal CheckM2 route.
+      solver:
+        type: string
+        description: COBRA-compatible optimization solver used by model and community tools.
+        minLength: 1
+        default: cplex
+      media:
+        type: string
+        description: Gap-filling medium supplied to metabolic modeling tools.
+        minLength: 1
+        default: M9
+      cplex:
+        type: object
+        description: CPLEX-specific setup used only when the CPLEX solver is selected.
+        properties:
+          studio_dir:
+            type: string
+            description: Optional CPLEX Studio path; empty enables CPLEX_STUDIO_DIR lookup.
+            default: ""
+          auto_upgrade:
+            type: boolean
+            description: Upgrade the active environment from CPLEX Community Edition when needed.
+            default: true
+        additionalProperties: false
+      execution:
+        type: object
+        description: Execution controls for metabolic modeling.
+        properties:
+          mock:
+            type: boolean
+            description: Use module mock execution intended for tests rather than scientific runs.
+            default: false
+        additionalProperties: false
+      qa:
+        type: object
+        description: Metabolic Modeling filtering applied to Annotation-selected prokaryotic MAGs; Main supplies Annotation's CheckM2 report and canonical columns when both QA switches are enabled.
+        properties:
+          enabled:
+            type: boolean
+            description: Filter Annotation-selected prokaryotic MAGs using the directly supplied Annotation QA report.
+            default: true
+          min_completeness:
+            type: number
+            description: Minimum completeness percentage required before model construction.
+            minimum: 0
+            maximum: 100
+            default: 50.0
+          max_contamination:
+            type: number
+            description: Maximum contamination percentage allowed before model construction.
+            minimum: 0
+            maximum: 100
+            default: 10.0
+        additionalProperties: false
+      memote:
+        type: object
+        description: Memote model-quality filtering.
+        properties:
+          min_total_score:
+            type: number
+            description: Minimum Memote total score retained for community modeling.
+            minimum: 0
+            maximum: 1
+            default: 0.4
+        additionalProperties: false
+      community:
+        type: object
+        description: Community-model construction and selected tools.
+        properties:
+          enabled:
+            type: boolean
+            description: Build community models from Memote-passing models.
+            default: true
+          tools:
+            type: object
+            description: Community modeling tools to run.
+            properties:
+              smetana:
+                type: boolean
+                description: Run SMETANA.
+                default: true
+              micom:
+                type: boolean
+                description: Run MICOM.
+                default: true
+              steadycom:
+                type: boolean
+                description: Run SteadyCom.
+                default: true
+            additionalProperties: false
+        additionalProperties: false
+      simulation_medium:
+        type: object
+        description: The one medium selection forwarded unchanged to MeeW-Metabolic_Modeling for native MICOM and SteadyCom; SMETANA remains independent.
+        properties:
+          source:
+            type: string
+            enum: [discover, predefined]
+            default: discover
+          aggregation:
+            type: string
+            enum: [sum, max]
+            default: sum
+            description: Discovery-only unweighted aggregation across the complete retained cohort.
+          predefined_medium:
+            type: string
+            minLength: 1
+            default: M9
+            description: Bundled M9 preset name or a user nutrient_id,uptake CSV path for predefined mode.
+          min_growth:
+            type: number
+            exclusiveMinimum: 0
+            default: 0.1
+            description: Absolute solo-model growth used only in discovery mode.
+          open_exchanges:
+            type: boolean
+            default: true
+            description: Discovery-only opening of exchanges that already exist.
+          exchange_bound:
+            type: number
+            exclusiveMinimum: 0
+            default: 1000
+            description: Discovery-only symmetric exchange opening bound.
+        required:
+          - source
+          - aggregation
+          - predefined_medium
+          - min_growth
+          - open_exchanges
+          - exchange_bound
+        additionalProperties: false
+      smetana:
+        type: object
+        description: SMETANA mode selection and optional user-supplied media database passed to MeeW-Metabolic_Modeling.
+        properties:
+          modes:
+            type: object
+            properties:
+              global:
+                type: boolean
+                default: true
+              detailed:
+                type: boolean
+                default: false
+            required: [global, detailed]
+            additionalProperties: false
+          media_db:
+            type: string
+            description: Optional SMETANA media TSV path; ~ and environment variables are expanded by MeeW-Metabolic_Modeling.
+            default: ""
+          media:
+            type: array
+            description: Media names selected from the medium column of media_db.
+            items:
+              type: string
+              minLength: 1
+            uniqueItems: true
+            default: []
+        required: [modes, media_db, media]
+        oneOf:
+          - properties:
+              media_db:
+                const: ""
+              media:
+                maxItems: 0
+          - properties:
+              media_db:
+                minLength: 1
+              media:
+                minItems: 1
+        additionalProperties: false
+      steadycom:
+        type: object
+        description: SteadyCom-specific settings.
+        properties:
+          objective:
+            type: string
+            const: community_growth
+            description: SteadyCom optimization objective.
+            default: community_growth
+        additionalProperties: false
+    required:
+      - solver
+    allOf:
+      - if:
+          properties:
+            community:
+              properties:
+                enabled:
+                  const: true
+                tools:
+                  properties:
+                    smetana:
+                      const: true
+                  required: [smetana]
+              required: [enabled, tools]
+          required: [community]
+        then:
+          required: [smetana]
+          properties:
+            smetana:
+              properties:
+                modes:
+                  anyOf:
+                    - properties:
+                        global:
+                          const: true
+                      required: [global]
+                    - properties:
+                        detailed:
+                          const: true
+                      required: [detailed]
+    additionalProperties: false
+
+allOf:
+  - if:
+      required: [genome_context]
+      properties:
+        genome_context:
+          const: metagenome
+    then:
+      required: [binning]
+  - if:
+      required: [genome_context, metabolic_modeling]
+      properties:
+        genome_context:
+          const: metagenome
+        metabolic_modeling:
+          required: [community]
+          properties:
+            community:
+              required: [enabled, tools]
+              properties:
+                enabled:
+                  const: true
+                tools:
+                  required: [micom]
+                  properties:
+                    micom:
+                      const: true
+    then:
+      properties:
+        binning:
+          properties:
+            coverm:
+              required: [domains, methods]
+              properties:
+                domains:
+                  contains:
+                    const: prok
+                methods:
+                  contains:
+                    const: relative_abundance
+required:
+  - genome_context
+  - preprocessing
+  - assembly
+  - annotation
+  - metabolic_modeling
+additionalProperties: false

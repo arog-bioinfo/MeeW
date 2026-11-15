@@ -1,0 +1,75 @@
+genome_context: euk
+
+preprocessing:
+  run_sheet: config/run.eukaryotic-isolate.tsv
+  auto_preprocess:
+    enabled: false
+
+assembly: {}
+
+annotation:
+  qa:
+    enabled: false
+    prok_tools:
+      - checkm2
+    euk_tools:
+      - eukcc
+    threads: 2
+    checkm2:
+      database_path: ""
+      download_database: false
+      extension: .fna
+      extra: ""
+    eukcc:
+      database_path: ""
+      download_database: false
+      extra: ""
+  qa_filter:
+    enabled: false
+  bakta:
+    db: ""
+    extra: ""
+  gtdbtk:
+    enabled: false
+    data_dir: ""
+    extra: ""
+  recognizer_prok:
+    resources_dir: ""
+    extra: ""
+  upimapi:
+    db: swissprot
+    db_custom: ""
+    resources_dir: ""
+    extra: ""
+    skip_db_check_if_exists: true
+  metaeuk:
+    database: UniRef90
+    db: ""
+    cache_dir: ""
+    max_exon_sets: 1
+    extra: ""
+  recognizer_euk:
+    resources_dir: ""
+    extra: ""
+  funannotate2:
+    db_dir: ""
+    databases:
+      - all
+    busco_lineage: eukaryota
+    clean: false
+    species: CI fixture species
+  threads:
+    high: 2
+    medium: 2
+    low: 1
+
+metabolic_modeling:
+  solver: scip
+  qa:
+    enabled: false
+  community:
+    enabled: false
+    tools:
+      smetana: false
+      micom: false
+      steadycom: false

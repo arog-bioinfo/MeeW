@@ -1,0 +1,15 @@
+# Deprecated standalone fragment. The active orchestrator uses config/config.yaml.
+run_sheet: config/preprocessing_run_sheet.tsv
+auto_preprocess:
+  enabled: false
+sequali:
+  extra: ""
+fastp:
+  adapters: ""
+  extra: ""
+chopper:
+  extra: ""
+porechop_abi:
+  extra: ""
+  ab_initio_config: ""
+  custom_adapters: ""

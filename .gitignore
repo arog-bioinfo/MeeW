@@ -1,0 +1,17 @@
+results/**
+resources/**
+logs/**
+.snakemake
+.snakemake/**
+.test/results/*
+workflow/notebooks/.ipynb_checkpoints/**
+**/.Rhistory
+**/*.Rproj
+**/.Rproj.user/**
+**/.RData
+**/Rplots.pdf
+TODO.md
+# Python caches and compiled files.
+.pytest_cache/
+__pycache__/
+*.py[cod]
